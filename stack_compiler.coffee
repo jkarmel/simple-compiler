@@ -2,23 +2,31 @@ assert = require 'assert'
 _ = require 'lodash'
 
 ops =
-  push: (stack, val) ->
-    stack.push val
-  add: (stack) ->
-    a = stack.pop()
-    b = stack.pop()
-    stack.push a + b
-  subtract: (stack) ->
-    diff = stack.pop()
-    from = stack.pop()
-    stack.push(from - diff)
+  push: (m, val) ->
+    m.stack.push val
+  add: (m) ->
+    a = m.stack.pop()
+    b = m.stack.pop()
+    m.stack.push a + b
+  subtract: (m) ->
+    diff = m.stack.pop()
+    from = m.stack.pop()
+    m.stack.push(from - diff)
+  trashVar: (m) ->
+    m.vars.pop()
+  pushVar: (m, index) ->
+    m.stack.push m.vars[index]
+  popToVars: (m) ->
+    m.vars.push m.stack.pop()
 
 run = (instructions) ->
-  stack = []
+  machine =
+    stack: []
+    vars: []
   for instruction in instructions
     [op, args...] = instruction
-    ops[op].apply {}, [stack, args...]
-  stack[0]
+    ops[op].apply {}, [machine, args...]
+  machine.stack[0]
 
 add4And3 = [
   ['push', 4]
@@ -41,30 +49,49 @@ parse = (string) ->
 
 assert.deepEqual ['+', ['-', 7, 3], ['+', 1, 2 ]], parse "[+ [- 7 3] [+ 1 2]]"
 
-generateInstructions = (program) ->
-  [op, args...] = program
-  instructions = []
-  for arg in args
-    if  _.isNumber arg
-      instructions.push ['push', arg]
-    else
-      instructions = instructions.concat generateInstructions arg
-  if op == '+'
-    instructions.push ['add']
-  else if op = '-'
-    instructions.push ['subtract']
-  instructions
+PRIMITIVE_OPS =
+  '+': 'add'
+  '-': 'subtract'
+
+emit =
+  instructions: (x, env = []) ->
+    return [['push', x]] if _.isNumber x
+    return [['pushVar', env.indexOf(x)]] if _.includes env, x
+    op = x[0]
+    if PRIMITIVE_OPS[op]
+      emit.primitive x, env
+    else if op == 'let'
+      emit.let x, env
+
+  let: (x, outer) ->
+    [op, binding, body] = x
+    [name, expression] = binding
+    inner = _(_.clone(outer)).push(name).value()
+    _.flatten [
+      emit.instructions expression, outer
+      [['popToVars']]
+      emit.instructions body, inner
+      [['trashVar']]
+    ]
+
+  primitive: (x, env) ->
+    [op, args...] = x
+    # ensure top of stack contains the evaluated arguements for
+    # the primitive operation
+    instructions = _.flatten _.map args, (arg) -> emit.instructions arg, env
+    instructions.concat [[PRIMITIVE_OPS[op]]]
 
 assert.deepEqual [
-  ['push', 7],
-  ['push', 3],
-  ['subtract'],
-  ['push', 1],
-  ['push', 2],
-  ['add'],
+  ['push', 7]
+  ['push', 3]
+  ['subtract']
+  ['push', 1]
+  ['push', 2]
   ['add']
-], generateInstructions ['+', ['-', 7, 3], ['+', 1, 2 ]]
+  ['add']
+], emit.instructions ['+', ['-', 7, 3], ['+', 1, 2 ]]
 
-compile = (string) -> generateInstructions parse string
+compile = (string) -> emit.instructions parse string
 
 assert 7 == run compile "[+ [- 7 3] [+ 1 2]]"
+assert 4 == run compile "[let [x 7] [let [y 3] [- x y]]]"
