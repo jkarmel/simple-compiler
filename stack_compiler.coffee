@@ -135,6 +135,15 @@ run = (string) ->
   exec 'rm tmp.s tmp.o tmp res'
   result
 
+assert.equal "3", run """
+[[+ 1 2]]
+"""
+
+assert.equal "3", run """
+[[define add_one [x] [+ 1 x]]
+  [add_one 2]]
+"""
+
 assert.equal "100", run """
 [[define square [x] [* x x]]
   [square 10]]
