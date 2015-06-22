@@ -141,6 +141,11 @@ assert.equal "100", run """
 """
 
 assert.equal "1000", run """
+[[define cube [x] [* [* x x] x]]
+  [cube 10]]
+"""
+
+assert.equal "1000", run """
 [[define square [x] [* x x]]
  [define cube [x] [* [square x] x]]
  [cube 10]]
