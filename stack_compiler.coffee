@@ -179,6 +179,11 @@ assert.equal "1000", run """
  [cube 10]]
 """
 
+assert.equal "42", run """
+[[define forty_two [] 42]
+ [forty_two]]
+"""
+
 assert.equal "13", run """
 [[define square [x] [* x x]]
  [define sum_of_squares [x y] [+ [square x] [square y]]]
