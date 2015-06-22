@@ -28,8 +28,8 @@ generate =
     definitions: assembly
   body: (body, definitions, env = []) ->
     if _.isNumber body
-      return "push $#{body}"
-    if _.include env, body
+      "push $#{body}"
+    else if _.include env, body
       # we add one is added above the arguments
       # we subtrack from the number of arguments
       # because arguments were pushed onto the stack
@@ -38,16 +38,17 @@ generate =
       # 8 because each item on the stack is 64 bits (8 bytes)
       stackOffest = (1 + env.length - _.indexOf(env, body)) * 8
       return "push #{stackOffest}(%rbp)"
-    [fn, args...] = body
-    asm = for arg in args
-      generate.body arg, definitions, env
-    name = if definitions[fn] then fn else PRIMITIVE[fn]
-    final = """
-      call _#{name}
-      add $#{8 * args.length}, %rsp
-      push %rax
-      """
-    asm.concat([final]).join "\n"
+    else
+      [fn, args...] = body
+      asm = for arg in args
+        generate.body arg, definitions, env
+      name = if definitions[fn] then fn else PRIMITIVE[fn]
+      final = """
+        call _#{name}
+        add $#{8 * args.length}, %rsp
+        push %rax
+        """
+      asm.concat([final]).join "\n"
 
 
 compile = (string) ->
