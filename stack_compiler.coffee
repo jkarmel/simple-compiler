@@ -79,13 +79,35 @@ compile = (string) ->
   leave
   ret
 
+  # for some reason if I push anything
+  # onto the stack I get a seg fault
+  # so when _print_int is called
+  # the value of %rax must contain the int
+  # (ie we aren't using normal calling conventions)
+  _print_int:
+  push   %rbp
+  mov    %rsp, %rbp
+
+  ## The value in %esi will be printed
+  mov %rax, %rsi
+  mov $0, %al
+  lea    .str(%rip), %rdi
+  push %rsi
+  push %rdi
+  call _printf
+  add $16, %rsp
+
+  leave
+  ret
+
+
+
   #{definitions.join("\n")}
 
   _main:                                  ## @main
 
   push   %rbp
   mov    %rsp, %rbp
-  lea    .str(%rip), %rdi
 
   # my program
   # get the right value into eax
@@ -93,12 +115,9 @@ compile = (string) ->
   #{assembly.main}
   pop %rax
 
-  ## The value in %esi will be printed
-  mov %eax, %esi
+  call _print_int
 
-  mov $0, %al
-  call _printf
-  pop %rbp
+  leave
   ret
 
         .section        __TEXT,__cstring,cstring_literals
