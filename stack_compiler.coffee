@@ -59,6 +59,18 @@ imul 24(%rbp), %rax
 leave
 ret
 
+_square:
+push   %rbp
+mov    %rsp, %rbp
+
+push 16(%rbp)
+push 16(%rbp)
+call _multiply
+add $16, %rsp
+
+leave
+ret
+
 _main:                                  ## @main
 
 push   %rbp
@@ -70,9 +82,8 @@ lea    .str(%rip), %rdi
 # get the right value into eax
 
 push $12
-push $12
-call _multiply
-add $16, %rsp
+call _square
+add $8, %rsp
 
 ## The value in %esi will be printed
 mov %eax, %esi
