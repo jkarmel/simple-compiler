@@ -56,7 +56,7 @@ generate =
 
 
 compile = (string) ->
-  assembly = generate.assembly extractProcedureDefinitions parse string
+  assembly = generate.assembly extractProcedureDefinitions parse "[#{_.trim(string)}]"
 
   definitions = for name, definition of assembly.definitions
     """
@@ -148,44 +148,43 @@ run = (string) ->
   result = fs.readFileSync('res').toString()[0..-2] # chop of trailing \n
   exec 'rm tmp.s tmp.o tmp res'
   result
+assert.equal "1", run "1"
+
+assert.equal "3", run "[+ 1 2]"
 
 assert.equal "3", run """
-[[+ 1 2]]
-"""
-
-assert.equal "3", run """
-[[define add_one [x] [+ 1 x]]
-  [add_one 2]]
+[define add_one [x] [+ 1 x]]
+[add_one 2]
 """
 
 assert.equal "23", run """
-[[define multiply_then_add [a b c] [+ [* a b] c]]
-  [multiply_then_add 5 4 3]]
+[define multiply_then_add [a b c] [+ [* a b] c]]
+[multiply_then_add 5 4 3]
 """
 
 assert.equal "100", run """
-[[define square [x] [* x x]]
-  [square 10]]
+[define square [x] [* x x]]
+[square 10]
 """
 
 assert.equal "1000", run """
-[[define cube [x] [* [* x x] x]]
-  [cube 10]]
+[define cube [x] [* [* x x] x]]
+[cube 10]
 """
 
 assert.equal "1000", run """
-[[define square [x] [* x x]]
- [define cube [x] [* [square x] x]]
- [cube 10]]
+[define square [x] [* x x]]
+[define cube [x] [* [square x] x]]
+[cube 10]
 """
 
-assert.equal "42", run """
-[[define forty_two [] 42]
- [forty_two]]
+assert.equal "42", run str = """
+[define forty_two [] 42]
+[forty_two]
 """
 
 assert.equal "13", run """
-[[define square [x] [* x x]]
- [define sum_of_squares [x y] [+ [square x] [square y]]]
- [sum_of_squares 2 3]]
+[define square [x] [* x x]]
+[define sum_of_squares [x y] [+ [square x] [square y]]]
+[sum_of_squares 2 3]
 """
