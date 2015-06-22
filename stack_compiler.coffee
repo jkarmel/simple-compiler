@@ -52,20 +52,12 @@ assembly = """
        .globl  _main
 
 _multiply:
-mov 8(%rsp), %r8
-mov 16(%rsp), %r9
-imul %r8, %r9
-mov %r9, %rax
-ret
-
-_square:
 push   %rbp
 mov    %rsp, %rbp
 mov 16(%rbp), %rax
-imul 16(%rbp), %rax
+imul 24(%rbp), %rax
 leave
 ret
-
 
 _main:                                  ## @main
 
@@ -78,8 +70,9 @@ lea    .str(%rip), %rdi
 # get the right value into eax
 
 push $12
-call _square
-add $8, %rsp
+push $12
+call _multiply
+add $16, %rsp
 
 ## The value in %esi will be printed
 mov %eax, %esi
