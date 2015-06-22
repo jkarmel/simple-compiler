@@ -27,8 +27,17 @@ generate =
     main: generate.body program.main, program.definitions
     definitions: assembly
   body: (body, definitions, env = []) ->
-    return "push $#{body}" if _.isNumber body
-    return "push #{8 * (_.indexOf(env, body) + 2)}(%rbp)" if _.include env, body
+    if _.isNumber body
+      return "push $#{body}"
+    if _.include env, body
+      # we add one is added above the arguments
+      # we subtrack from the number of arguments
+      # because arguments were pushed onto the stack
+      # in order of appearance so the first argument
+      # is further down the stack. We multiply by
+      # 8 because each item on the stack is 64 bits (8 bytes)
+      stackOffest = (1 + env.length - _.indexOf(env, body)) * 8
+      return "push #{stackOffest}(%rbp)"
     [fn, args...] = body
     asm = for arg in args
       generate.body arg, definitions, env
@@ -142,6 +151,11 @@ assert.equal "3", run """
 assert.equal "3", run """
 [[define add_one [x] [+ 1 x]]
   [add_one 2]]
+"""
+
+assert.equal "23", run """
+[[define multiply_then_add [a b c] [+ [* a b] c]]
+  [multiply_then_add 5 4 3]]
 """
 
 assert.equal "100", run """
