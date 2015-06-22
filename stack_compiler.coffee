@@ -2,13 +2,36 @@ assert = require 'assert'
 _ = require 'lodash'
 require 'shelljs/global'
 fs = require 'fs'
+traverse = require 'traverse'
 
-replace = (string) -> string.replace(/\s+/g,",").replace(/[a-z\+\-\*\_]+/g, '"$&"')
+replace = (string) -> string.replace(/\s+/g,",").replace(/[a-z\+\-\*\_]+[0-9]*/g, '"$&"')
 parse = (string) -> JSON.parse replace string
 
 assert.deepEqual ['+', ['-', 7, 3], ['+', 1, 2 ]], parse "[+ [- 7 3] [+ 1 2]]"
 
+transformLet = (ast) ->
+  anonomousFns = {}
+  ast = traverse(ast).forEach (node) ->
+    if node[0] == 'let'
+      [keyword, bindings, body] = node
+      fnName = _.uniqueId("anonymous_procedure_")
+      bindingNames = for i in _.range 0, bindings.length, 2
+        bindings[i]
+      anonomousFns[fnName] =
+        args: bindingNames
+        body: body
+      bindingExpressions = for i in _.range 0, bindings.length, 2
+        bindings[i + 1]
+      @update [fnName, bindingExpressions...]
+  for name, {args, body} of anonomousFns
+    ast.unshift ["define", name, args ,body]
+  ast
+assert.deepEqual [[ 'define', 'anonymous_procedure_1', [ 'x', 'y' ], [ '+', 'x', 'y' ] ],
+  [ 'anonymous_procedure_1', 1, [ '+', 1, 1 ] ] ], transformLet parse """
+[[let [x 1 y [+ 1 1]] [+ x y]]]
+"""
 extractProcedureDefinitions = (ast) ->
+  ast = transformLet ast
   definitions = _.select ast, (node) -> node[0] is 'define'
   definitions = _.object _.map definitions, (def) ->
     [def[1], {args: def[2], body: def[3]}]
@@ -187,4 +210,13 @@ assert.equal "13", run """
 [define square [x] [* x x]]
 [define sum_of_squares [x y] [+ [square x] [square y]]]
 [sum_of_squares 2 3]
+"""
+
+assert.equal "4", run """
+[define anonymous_procedure_0 [x] [* x 2]]
+[anonymous_procedure_0 2]
+"""
+
+assert.equal "3", run """
+[let [x 1 y [+ 1 1]] [+ x y]]
 """
