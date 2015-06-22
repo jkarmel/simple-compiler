@@ -8,8 +8,8 @@ parse = (string) ->
 
 assert.deepEqual ['+', ['-', 7, 3], ['+', 1, 2 ]], parse "[+ [- 7 3] [+ 1 2]]"
 
-square10 = [['define', 'square', ['x'], ['*', 'x', 'x']],
-            ['square', 10]]
+cube10 = [['define', 'cube', ['x'], ['*', ['*', 'x', 'x'], 'x']],
+            ['cube', 10]]
 
 extractProcedureDefinitions = (ast) ->
   definitions = _.select ast, (node) -> node[0] is 'define'
@@ -26,24 +26,41 @@ generate =
     main: generate.body program.main, program.definitions
     definitions: assembly
   body: (body, definitions, env = []) ->
-    console.log env: env, body: body
     return "push $#{body}" if _.isNumber body
-    return "push -#{4 * (_.indexOf(env, body) + 1)}(esb)" if _.include env, body
+    return "push #{8 * (_.indexOf(env, body) + 2)}(%rbp)" if _.include env, body
     [fn, args...] = body
     asm = for arg in args
       generate.body arg, definitions, env
     final = if definitions[fn]
-      "call #{fn}"
+      """
+      call _#{fn}
+      add $#{8 * args.length}, %rsp
+      push %rax
+      """
     else if fn is '*'
       """
-      pop %r8
-      pop %r9
-      add %r8, %r9
-      push %r9
+      call _multiply
+      add $#{8 * args.length}, %rsp
+      push %rax
       """
     asm.concat([final]).join "\n"
 
-console.log JSON.stringify generate.assembly extractProcedureDefinitions square10
+assembly = generate.assembly extractProcedureDefinitions cube10
+
+definitions = for name, definition of assembly.definitions
+  """
+  _#{name}:
+  push   %rbp
+  mov    %rsp, %rbp
+
+  #{definition}
+  pop %rax
+
+  leave
+  ret
+  """
+
+definitions.join("\n")
 
 assembly = """
        .section        __TEXT,__text,regular,pure_instructions
@@ -59,17 +76,8 @@ imul 24(%rbp), %rax
 leave
 ret
 
-_square:
-push   %rbp
-mov    %rsp, %rbp
 
-push 16(%rbp)
-push 16(%rbp)
-call _multiply
-add $16, %rsp
-
-leave
-ret
+#{definitions}
 
 _main:                                  ## @main
 
@@ -81,9 +89,8 @@ lea    .str(%rip), %rdi
 # my program
 # get the right value into eax
 
-push $12
-call _square
-add $8, %rsp
+#{assembly.main}
+pop %rax
 
 ## The value in %esi will be printed
 mov %eax, %esi
