@@ -1,5 +1,7 @@
 assert = require 'assert'
 _ = require 'lodash'
+require 'shelljs/global'
+fs = require 'fs'
 
 ops =
   push: (stack, val) ->
@@ -63,4 +65,64 @@ assert.deepEqual [
 
 compile = (string) -> generateInstructions parse string
 
+string = "[+ [- 7 3] [+ 1 4]]"
 assert 7 == run compile "[+ [- 7 3] [+ 1 2]]"
+
+assembly =
+  from: (instructions) ->
+    asm = for instruction in instructions
+      switch instruction[0]
+        when 'push'
+          "push $#{instruction[1]}"
+        when 'add'
+          """
+          pop %r8
+          pop %r9
+          add %r8, %r9
+          push %r9
+          """
+        when 'subtract'
+          """
+          pop %r8
+          pop %r9
+          sub %r8, %r9
+          push %r9
+          """
+    asm.join('\n')
+
+code = assembly.from compile string
+
+assembly = """
+	.section	__TEXT,__text,regular,pure_instructions
+	.macosx_version_min 10, 10
+	.align	4, 0x90
+	.globl	_main
+_main:                                  ## @main
+push	%rbp
+mov	%rsp, %rbp
+sub	$16, %rsp
+lea	.str(%rip), %rdi
+
+# my program
+# get the right value into eax
+#{code}
+pop %rax
+
+## The value in %esi will be printed
+mov %eax, %esi
+
+mov $0, %al
+call _printf
+add $16, %rsp
+pop %rbp
+ret
+
+	.section	__TEXT,__cstring,cstring_literals
+.str:                                 ## @.str
+	.asciz	"%d\n"
+
+
+.subsections_via_symbols
+"""
+fs.writeFileSync('tmp.s', assembly)
+exec 'gcc -c tmp.s -o tmp.o && gcc tmp.o -o tmp && ./tmp'
