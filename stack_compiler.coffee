@@ -20,23 +20,55 @@ extractProcedureDefinitions = (ast) ->
 generate =
   assembly: (program) ->
     assembly = {}
-    for name, {args, body} definitions of program.definitions
-      assembly[name] = generate.body body, args
+    for name, {args, body} of program.definitions
+      assembly[name] = generate.body body, program.definitions, args
     assembly
-    main: generate.body program.main
-    definitions: assemblyDefinitions
+    main: generate.body program.main, program.definitions
+    definitions: assembly
   body: (body, definitions, env = []) ->
+    console.log env: env, body: body
+    return "push $#{body}" if _.isNumber body
+    return "push -#{4 * (_.indexOf(env, body) + 1)}(esb)" if _.include env, body
     [fn, args...] = body
-    if definitions[fn]
+    asm = for arg in args
+      generate.body arg, definitions, env
+    final = if definitions[fn]
+      "call #{fn}"
+    else if fn is '*'
+      """
+      pop %r8
+      pop %r9
+      add %r8, %r9
+      push %r9
+      """
+    asm.concat([final]).join "\n"
 
-console.log JSON.stringify extractProcedureDefinitions square10
+console.log JSON.stringify generate.assembly extractProcedureDefinitions square10
 
 assembly = """
        .section        __TEXT,__text,regular,pure_instructions
        .macosx_version_min 10, 10
        .align  4, 0x90
        .globl  _main
+
+_multiply:
+mov 8(%rsp), %r8
+mov 16(%rsp), %r9
+imul %r8, %r9
+mov %r9, %rax
+ret
+
+_square:
+push   %rbp
+mov    %rsp, %rbp
+mov 16(%rbp), %rax
+imul 16(%rbp), %rax
+leave
+ret
+
+
 _main:                                  ## @main
+
 push   %rbp
 mov    %rsp, %rbp
 sub    $16, %rsp
@@ -45,7 +77,10 @@ lea    .str(%rip), %rdi
 # my program
 # get the right value into eax
 
-mov $10, %eax
+push $12
+call _square
+add $8, %rsp
+
 ## The value in %esi will be printed
 mov %eax, %esi
 
