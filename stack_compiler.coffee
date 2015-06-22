@@ -44,8 +44,12 @@ generate =
         generate.body arg, definitions, env
       name = if definitions[fn] then fn else PRIMITIVE[fn]
       final = """
+        # call the procedure
         call _#{name}
+        # move the stack pointer past the arguments we pushed for the function call
         add $#{8 * args.length}, %rsp
+        # the result is in %rax but we want to add it to the stack for
+        # whatever procedure is coming next
         push %rax
         """
       asm.concat([final]).join "\n"
